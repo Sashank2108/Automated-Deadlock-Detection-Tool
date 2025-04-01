@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Deadlock Detection Simulator</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Deadlock Detection Simulator</h1>
+            <p class="subtitle">Visualize and Analyze Resource Allocation Scenarios</p>
+        </header>
+
+        <main>
+            <section id="simulatorSection" class="section active">
+                <div id="process-resource-controls">
+                    <div class="config-group">
+                        <label for="numProcesses">Number of Processes:</label>
+                        <input type="number" id="numProcesses" min="1" max="10" value="3" aria-label="Number of Processes" style="margin-left:10px;">
+                    </div>
+                    <div class="config-group">
+                        <label for="numResources">Number of Resources:</label>
+                        <input type="number" id="numResources" min="1" max="10" value="3" aria-label="Number of Resource Types" style="margin-left: 10px;">
+                    </div><br>
+                    <button id="createMatrices" class="primary-btn" aria-label="Configure Scenario">Intialize Matrices</button>
+                </div>
+                
+                <div id="matrices" class="hidden">
+                    <div class="matrix-section">
+                        <h2>Allocated Resources</h2>
+                        <div class="matrix-container">
+                            <table id="allocatedTable" aria-label="Allocated Resources Table"></table>
+                        </div>
+                    </div>
+                    
+                    <div class="matrix-section">
+                        <h2>Requested Resources</h2>
+                        <div class="matrix-container">
+                            <table id="requestedTable" aria-label="Requested Resources Table"></table>
+                        </div>
+                    </div>
+                    
+                    <div class="matrix-section">
+                        <h2>Available Resources</h2>
+                        <div class="matrix-container">
+                            <table id="availableTable" aria-label="Available Resources Table"></table>
+                        </div>
+                    </div>
+                    
+                    <div class="controls">
+                        <button id="detectDeadlock" class="primary-btn" aria-label="Detect Deadlock">Detect Deadlock</button>
+                        <button id="exportScenario" class="secondary-btn" aria-label="Export Scenario">Export Scenario</button>
+                        <button id="importScenario" class="secondary-btn" aria-label="Import Scenario">Import Scenario</button>
+                        <button id="reset" class="reset-btn" aria-label="Reset">Reset</button>
+                    </div>
+                </div>
+                
+                <div id="result" class="hidden"></div>
+                
+                <div id="steps-container" class="hidden">
+                    <h2>Execution Steps Visualization</h2>
+                    <div id="steps-visualization" class="steps-visualization"></div>
+                </div>
+
+                <div id="scenarioImportModal" class="modal hidden">
+                    <div class="modal-content">
+                        <span class="close-modal" aria-label="Close Modal">&times;</span>
+                        <h2>Import Scenario</h2>
+                        <textarea id="scenarioImportText" placeholder="Paste your scenario JSON here" aria-label="Scenario Import Textarea"></textarea>
+                        <button id="confirmImport" class="primary-btn" aria-label="Confirm Import">Import</button>
+                    </div>
+                </div>
+            </section>
+        </main>
+
+        <!-- <footer>
+            <p>&copy; 2024 Deadlock Detection Simulator | Created for Educational Purposes</p>
+        </footer> -->
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
