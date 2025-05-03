@@ -1,5 +1,6 @@
 document.addEventListener('DOMContentLoaded', () => {
     // DOM Elements
+    const modeSelect = document.getElementById('modeSelect');
     const numProcessesInput = document.getElementById('numProcesses');
     const numResourcesInput = document.getElementById('numResources');
     const createMatricesButton = document.getElementById('createMatrices');
@@ -15,45 +16,148 @@ document.addEventListener('DOMContentLoaded', () => {
     const resultDiv = document.getElementById('result');
     const stepsContainer = document.getElementById('steps-container');
     const stepsVisualization = document.getElementById('steps-visualization');
+    const ragVisualization = document.getElementById('rag-visualization');
+    const maxSection = document.getElementById('maxSection');
+    const allocatedSection = document.getElementById('allocatedSection');
+    const requestedSection = document.getElementById('requestedSection');
+    const availableSection = document.getElementById('availableSection');
+    const ragHeading = document.getElementById('rag-heading');
 
     // Helper function to get matrix values
     function getMatrixValues() {
-        const numProcesses = parseInt(numProcessesInput.value);
-        const numResources = parseInt(numResourcesInput.value);
-        
-        const allocated = [];
-        const requested = [];
-        const available = [];
-        
-        // Collect allocated resources
-        for (let i = 0; i < numProcesses; i++) {
-            const processAllocated = [];
-            for (let j = 0; j < numResources; j++) {
-                processAllocated.push(parseInt(document.getElementById(`allocated-${i}-${j}`).value) || 0);
+        try {
+            const numProcesses = parseInt(numProcessesInput.value) || 0;
+            const numResources = parseInt(numResourcesInput.value) || 0;
+            const mode = modeSelect.value;
+            
+            if (numProcesses <= 0 || numResources <= 0) {
+                throw new Error("Number of processes and resources must be positive.");
             }
-            allocated.push(processAllocated);
-        }
-        
-        // Collect requested resources
-        for (let i = 0; i < numProcesses; i++) {
-            const processRequested = [];
-            for (let j = 0; j < numResources; j++) {
-                processRequested.push(parseInt(document.getElementById(`requested-${i}-${j}`).value) || 0);
+
+            const max = [];
+            const allocated = [];
+            const requested = [];
+            const available = [];
+            
+            if (mode === 'multi') {
+                for (let i = 0; i < numProcesses; i++) {
+                    const processMax = [];
+                    for (let j = 0; j < numResources; j++) {
+                        const value = parseInt(document.getElementById(`max-${i}-${j}`)?.value) || 0;
+                        if (value < 0) throw new Error(`Negative value in max matrix at P${i}, R${j}.`);
+                        processMax.push(value);
+                    }
+                    max.push(processMax);
+                }
             }
-            requested.push(processRequested);
+            
+            for (let i = 0; i < numProcesses; i++) {
+                const processAllocated = [];
+                for (let j = 0; j < numResources; j++) {
+                    const value = parseInt(document.getElementById(`allocated-${i}-${j}`)?.value) || 0;
+                    if (value < 0) throw new Error(`Negative value in allocated matrix at P${i}, R${j}.`);
+                    processAllocated.push(value);
+                }
+                allocated.push(processAllocated);
+            }
+            
+            if (mode === 'single') {
+                for (let i = 0; i < numProcesses; i++) {
+                    const processRequested = [];
+                    for (let j = 0; j < numResources; j++) {
+                        const value = parseInt(document.getElementById(`requested-${i}-${j}`)?.value) || 0;
+                        if (value < 0) throw new Error(`Negative value in requested matrix at P${i}, R${j}.`);
+                        processRequested.push(value);
+                    }
+                    requested.push(processRequested);
+                }
+            }
+            
+            for (let j = 0; j < numResources; j++) {
+                const value = parseInt(document.getElementById(`available-${j}`)?.value) || 0;
+                if (value < 0) throw new Error(`Negative value in available matrix for R${j}.`);
+                available.push(value);
+            }
+            
+            return { max, allocated, requested, available };
+        } catch (error) {
+            throw new Error(`Error reading matrix values: ${error.message}`);
         }
-        
-        // Collect available resources
-        for (let j = 0; j < numResources; j++) {
-            available.push(parseInt(document.getElementById(`available-${j}`).value) || 0);
+    }
+
+    // Validate input for the current mode
+    function validateInputForMode(matrices, mode, numProcesses, numResources) {
+        const { max, allocated, requested, available } = matrices;
+
+        // Check matrix dimensions
+        if (allocated.length !== numProcesses || (allocated.length > 0 && allocated[0].length !== numResources)) {
+            return `Error: Allocated matrix dimensions (${allocated.length}x${allocated[0]?.length || 0}) do not match specified processes (${numProcesses}) and resources (${numResources}).`;
         }
-        
-        return { allocated, requested, available };
+        if (mode === 'single' && (requested.length !== numProcesses || (requested.length > 0 && requested[0].length !== numResources))) {
+            return `Error: Requested matrix dimensions (${requested.length}x${requested[0]?.length || 0}) do not match specified processes (${numProcesses}) and resources (${numResources}).`;
+        }
+        if (mode === 'multi' && (max.length !== numProcesses || (max.length > 0 && max[0].length !== numResources))) {
+            return `Error: Max matrix dimensions (${max.length}x${max[0]?.length || 0}) do not match specified processes (${numProcesses}) and resources (${numResources}).`;
+        }
+        if (available.length !== numResources) {
+            return `Error: Available matrix length (${available.length}) does not match specified resources (${numResources}).`;
+        }
+
+        if (mode === 'single') {
+            // Single mode requires allocated, requested, and available, but not max
+            if (!allocated.length || !requested.length || !available.length) {
+                return "Error: Single mode requires allocated, requested, and available matrices.";
+            }
+            if (max.length > 0) {
+                return "Error: Max matrix is not allowed in single mode.";
+            }
+            // Check that requested matrix values are 0 or 1
+            for (let i = 0; i < requested.length; i++) {
+                for (let j = 0; j < requested[i].length; j++) {
+                    if (requested[i][j] > 1) {
+                        return `Error: In single mode, requested values must be 0 or 1 (found ${requested[i][j]} at P${i}, R${j}).`;
+                    }
+                }
+            }
+            // Check that allocated matrix values are 0 or 1
+            for (let i = 0; i < allocated.length; i++) {
+                for (let j = 0; j < allocated[i].length; j++) {
+                    if (allocated[i][j] > 1) {
+                        return `Error: In single mode, allocated values must be 0 or 1 (found ${allocated[i][j]} at P${i}, R${j}).`;
+                    }
+                }
+            }
+            // Check that available values are 0 or 1
+            for (let j = 0; j < available.length; j++) {
+                if (available[j] > 1) {
+                    return `Error: In single mode, available values must be 0 or 1 (found ${available[j]} for R${j}).`;
+                }
+            }
+            // Check that sum of allocated and available for each resource does not exceed 1
+            for (let j = 0; j < available.length; j++) {
+                let totalAllocated = 0;
+                for (let i = 0; i < allocated.length; i++) {
+                    totalAllocated += allocated[i][j];
+                }
+                if (totalAllocated + available[j] > 1) {
+                    return `Error: In single mode, the sum of allocated and available instances for R${j} must not exceed 1 (found allocated: ${totalAllocated}, available: ${available[j]}).`;
+                }
+            }
+        } else if (mode === 'multi') {
+            // Multi mode requires allocated, max, and available, but not requested
+            if (!allocated.length || !max.length || !available.length) {
+                return "Error: Multi mode requires allocated, max, and available matrices.";
+            }
+            if (requested.length > 0) {
+                return "Error: Requested matrix is not allowed in multi mode.";
+            }
+        }
+        return null; // No error
     }
 
     // Display result function
     function displayResult(result) {
-        resultDiv.innerHTML = ''; // Clear previous results
+        resultDiv.innerHTML = '';
         resultDiv.classList.remove('hidden');
         
         const resultHTML = `
@@ -65,27 +169,26 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             </div>
         `;
-        
         resultDiv.innerHTML = resultHTML;
     }
 
     // Create matrix input tables dynamically
     function createDynamicTable(tableId, rows, columns, prefix) {
         const table = document.getElementById(tableId);
-        table.innerHTML = ''; // Clear existing content
+        if (!table) throw new Error(`Table with ID ${tableId} not found.`);
+        table.innerHTML = '';
 
-        // Create header row
         const headerRow = document.createElement('tr');
         headerRow.innerHTML = '<th>Process</th>' + 
             Array.from({length: columns}, (_, j) => `<th>R${j}</th>`).join('');
         table.appendChild(headerRow);
 
-        // Create input rows
+        const mode = modeSelect.value;
         for (let i = 0; i < rows; i++) {
             const row = document.createElement('tr');
             row.innerHTML = `<td>P${i}</td>` + 
                 Array.from({length: columns}, (_, j) => 
-                    `<td><input type="number" min="0" id="${prefix}-${i}-${j}" value="0"></td>`
+                    `<td><input type="number" min="0" ${mode === 'single' ? 'max="1" oninput="this.value = Math.min(1, Math.max(0, parseInt(this.value) || 0))"' : ''} id="${prefix}-${i}-${j}" value="0"></td>`
                 ).join('');
             table.appendChild(row);
         }
@@ -93,93 +196,174 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Create matrix tables based on user input
     createMatricesButton.addEventListener('click', () => {
-        const numProcesses = parseInt(numProcessesInput.value);
-        const numResources = parseInt(numResourcesInput.value);
-        
-        if (numProcesses > 0 && numResources > 0) {
-            createDynamicTable('allocatedTable', numProcesses, numResources, 'allocated');
-            createDynamicTable('requestedTable', numProcesses, numResources, 'requested');
+        try {
+            const numProcesses = parseInt(numProcessesInput.value);
+            const numResources = parseInt(numResourcesInput.value);
+            const mode = modeSelect.value;
             
-            // Create available resources table
+            if (numProcesses <= 0 || numResources <= 0) {
+                alert("Number of processes and resources must be positive.");
+                return;
+            }
+            if (numProcesses > 10 || numResources > 10) {
+                alert("Maximum 10 processes and 10 resources allowed.");
+                return;
+            }
+
+            createDynamicTable('allocatedTable', numProcesses, numResources, 'allocated');
             const availableTable = document.getElementById('availableTable');
             availableTable.innerHTML = '<tr><th>Resource</th><th>Available</th></tr>' +
                 Array.from({length: numResources}, (_, j) => 
-                    `<tr><td>R${j}</td><td><input type="number" min="0" id="available-${j}" value="0"></td></tr>`
+                    `<tr><td>R${j}</td><td><input type="number" min="0" ${mode === 'single' ? 'max="1" oninput="this.value = Math.min(1, Math.max(0, parseInt(this.value) || 0))"' : ''} id="available-${j}" value="0"></td></tr>`
                 ).join('');
+
+            if (mode === 'single') {
+                createDynamicTable('requestedTable', numProcesses, numResources, 'requested');
+                requestedSection.classList.remove('hidden');
+                maxSection.classList.add('hidden');
+                ragVisualization.style.display = 'block';
+                ragHeading.style.display = 'block';
+            } else {
+                createDynamicTable('maxTable', numProcesses, numResources, 'max');
+                maxSection.classList.remove('hidden');
+                requestedSection.classList.add('hidden');
+                ragVisualization.style.display = 'none';
+                ragHeading.style.display = 'none';
+            }
             
             matricesDiv.classList.remove('hidden');
             resultDiv.classList.add('hidden');
             stepsContainer.classList.add('hidden');
+        } catch (error) {
+            alert(`Error configuring matrices: ${error.message}`);
         }
     });
 
-    // Detect deadlock function
+    // Detect deadlock function with RAG data (only for single mode)
     function detectDeadlock() {
-        const { allocated, requested, available } = getMatrixValues();
-        const numProcesses = allocated.length;
-        const numResources = available.length;
-        
-        const work = [...available];
-        const finish = new Array(numProcesses).fill(false);
-        const steps = [];
-        
-        let progress = true;
-        while (progress) {
-            progress = false;
+        try {
+            const { max, allocated, requested, available } = getMatrixValues();
+            const numProcesses = parseInt(numProcessesInput.value);
+            const numResources = parseInt(numResourcesInput.value);
+            const mode = modeSelect.value;
             
+            const work = [...available];
+            const finish = new Array(numProcesses).fill(false);
+            const steps = [];
+            
+            let progress = true;
+            while (progress) {
+                progress = false;
+                
+                for (let i = 0; i < numProcesses; i++) {
+                    if (finish[i]) continue;
+                    
+                    let canFinish = true;
+                    let need = [];
+                    if (mode === 'single') {
+                        need = requested[i];
+                        for (let j = 0; j < numResources; j++) {
+                            if (requested[i][j] > work[j]) {
+                                canFinish = false;
+                                break;
+                            }
+                        }
+                    } else {
+                        need = max[i].map((m, j) => m - allocated[i][j]);
+                        for (let j = 0; j < numResources; j++) {
+                            if (need[j] > work[j]) {
+                                canFinish = false;
+                                break;
+                            }
+                        }
+                    }
+                    
+                    if (canFinish) {
+                        const step = {
+                            process: i,
+                            request: [...need],
+                            allocated: [...allocated[i]],
+                            beforeAvailable: [...work],
+                            afterAvailable: null,
+                            description: `Process P${i} can proceed and release resources.`
+                        };
+                        
+                        finish[i] = true;
+                        progress = true;
+                        
+                        for (let j = 0; j < numResources; j++) {
+                            work[j] += allocated[i][j];
+                        }
+                        
+                        step.afterAvailable = [...work];
+                        steps.push(step);
+                    }
+                }
+            }
+            
+            const deadlockedProcesses = [];
             for (let i = 0; i < numProcesses; i++) {
-                if (finish[i]) continue;
+                if (!finish[i]) {
+                    deadlockedProcesses.push(i);
+                }
+            }
+            
+            // Prepare RAG data only for single mode
+            let rag = { nodes: [], edges: [] };
+            if (mode === 'single') {
+                const nodes = [];
+                const edges = [];
                 
-                let canFinish = true;
+                // Add process nodes
+                for (let i = 0; i < numProcesses; i++) {
+                    nodes.push({ id: `P${i}`, label: `P${i}`, shape: 'circle', color: finish[i] ? '#2ecc71' : '#e74c3c' });
+                }
+                
+                // Add resource nodes
                 for (let j = 0; j < numResources; j++) {
-                    if (requested[i][j] > work[j]) {
-                        canFinish = false;
-                        break;
+                    nodes.push({ id: `R${j}`, label: `R${j}`, shape: 'box', color: '#3498db' });
+                }
+                
+                // Add allocation edges (Resource -> Process)
+                for (let i = 0; i < numProcesses; i++) {
+                    for (let j = 0; j < numResources; j++) {
+                        if (allocated[i][j] > 0) {
+                            edges.push({ from: `R${j}`, to: `P${i}`, arrows: 'to', label: `${allocated[i][j]}`, color: '#95a5a6' });
+                            console.log(`Added allocation edge: R${j} -> P${i} with ${allocated[i][j]}`);
+                        }
                     }
                 }
                 
-                if (canFinish) {
-                    const step = {
-                        process: i,
-                        request: requested[i],
-                        allocated: allocated[i],
-                        beforeAvailable: [...work],
-                        afterAvailable: null,
-                        description: `Process P${i} can proceed and release resources.`
-                    };
-                    
-                    finish[i] = true;
-                    progress = true;
-                    
+                // Add request edges (Process -> Resource) for all non-zero requests
+                for (let i = 0; i < numProcesses; i++) {
                     for (let j = 0; j < numResources; j++) {
-                        work[j] += allocated[i][j];
+                        if (requested[i][j] > 0) {
+                            edges.push({ from: `P${i}`, to: `R${j}`, arrows: 'to', label: `${requested[i][j]}`, color: '#e74c3c', dashes: true });
+                            console.log(`Added request edge: P${i} -> R${j} with ${requested[i][j]}`);
+                        }
                     }
-                    
-                    step.afterAvailable = [...work];
-                    steps.push(step);
                 }
+                
+                rag = { nodes, edges };
+                console.log('RAG nodes:', nodes);
+                console.log('RAG edges:', edges);
             }
+            
+            return { 
+                isDeadlock: deadlockedProcesses.length > 0,
+                deadlockedProcesses,
+                steps,
+                rag
+            };
+        } catch (error) {
+            throw new Error(`Error detecting deadlock: ${error.message}`);
         }
-        
-        const deadlockedProcesses = [];
-        for (let i = 0; i < numProcesses; i++) {
-            if (!finish[i]) {
-                deadlockedProcesses.push(i);
-            }
-        }
-        
-        return { 
-            isDeadlock: deadlockedProcesses.length > 0,
-            deadlockedProcesses,
-            steps
-        };
     }
 
-    // Visualize steps with improved styling
+    // Visualize steps
     function visualizeSteps(result) {
-        stepsVisualization.innerHTML = ''; // Clear previous visualization
+        stepsVisualization.innerHTML = '';
         
-        // Create deadlock message if needed
         if (result.isDeadlock) {
             const deadlockMessage = document.createElement('div');
             deadlockMessage.classList.add('deadlock-message');
@@ -192,15 +376,12 @@ document.addEventListener('DOMContentLoaded', () => {
             stepsVisualization.appendChild(deadlockMessage);
         }
         
-        // Create steps timeline
         const timeline = document.createElement('div');
         timeline.classList.add('steps-timeline');
         
         result.steps.forEach((step, index) => {
             const stepElement = document.createElement('div');
             stepElement.classList.add('timeline-step');
-            
-            // Determine color based on process
             const colors = ['#00b894', '#6c5ce7', '#e84393', '#fd79a8', '#a29bfe'];
             const processColor = colors[step.process % colors.length];
             
@@ -212,7 +393,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 <div class="timeline-step-content">
                     <div class="step-details">
                         <div class="detail-row">
-                            <strong>Request:</strong>
+                            <strong>${modeSelect.value === 'single' ? 'Request' : 'Need'}:</strong>
                             ${step.request.map((r, i) => `R${i}: ${r}`).join(' | ')}
                         </div>
                         <div class="detail-row">
@@ -240,30 +421,85 @@ document.addEventListener('DOMContentLoaded', () => {
         stepsVisualization.appendChild(timeline);
     }
 
+    // Visualize RAG
+    function visualizeRAG(rag) {
+        try {
+            if (!ragVisualization) {
+                throw new Error("RAG visualization container not found.");
+            }
+            const container = ragVisualization;
+            const data = {
+                nodes: new vis.DataSet(rag.nodes),
+                edges: new vis.DataSet(rag.edges)
+            };
+            const options = {
+                nodes: {
+                    font: { color: '#ffffff', size: 16 },
+                    borderWidth: 2
+                },
+                edges: {
+                    font: { color: '#ffffff', size: 14 }, // Increased font size for better readability
+                    arrows: { to: { enabled: true, scaleFactor: 1 } },
+                    smooth: { type: 'curvedCW', roundness: 0.2 }
+                },
+                layout: {
+                    hierarchical: false
+                },
+                physics: {
+                    enabled: true,
+                    barnesHut: { gravitationalConstant: -2000 }
+                }
+            };
+            new vis.Network(container, data, options);
+        } catch (error) {
+            console.error(`Error visualizing RAG: ${error.message}`);
+            alert(`Error visualizing RAG: ${error.message}`);
+        }
+    }
+
     // Reset functionality
     resetButton.addEventListener('click', () => {
+        modeSelect.value = 'single';
         numProcessesInput.value = 3;
         numResourcesInput.value = 3;
         matricesDiv.classList.add('hidden');
         resultDiv.classList.add('hidden');
         stepsContainer.classList.add('hidden');
+        ragVisualization.style.display = 'block';
+        ragHeading.style.display = 'block';
     });
 
     // Export scenario
     exportScenarioButton.addEventListener('click', () => {
-        const { allocated, requested, available } = getMatrixValues();
-        const scenario = { allocated, requested, available };
-        const scenarioJSON = JSON.stringify(scenario, null, 2);
-        
-        // Create a temporary textarea to copy the JSON
-        const tempTextArea = document.createElement('textarea');
-        tempTextArea.value = scenarioJSON;
-        document.body.appendChild(tempTextArea);
-        tempTextArea.select();
-        document.execCommand('copy');
-        document.body.removeChild(tempTextArea);
-        
-        alert('Scenario copied to clipboard!');
+        try {
+            const { max, allocated, requested, available } = getMatrixValues();
+            const mode = modeSelect.value;
+            
+            const scenario = { 
+                mode: mode,
+                allocated: allocated,
+                available: available
+            };
+            
+            if (mode === 'single') {
+                scenario.requested = requested;
+            } else {
+                scenario.max = max;
+            }
+            
+            const scenarioJSON = JSON.stringify(scenario, null, 2);
+            
+            const tempTextArea = document.createElement('textarea');
+            tempTextArea.value = scenarioJSON;
+            document.body.appendChild(tempTextArea);
+            tempTextArea.select();
+            document.execCommand('copy');
+            document.body.removeChild(tempTextArea);
+            
+            alert('Scenario copied to clipboard!');
+        } catch (error) {
+            alert(`Error exporting scenario: ${error.message}`);
+        }
     });
 
     // Import scenario button
@@ -282,222 +518,97 @@ document.addEventListener('DOMContentLoaded', () => {
             const scenarioJSON = scenarioImportText.value;
             const scenario = JSON.parse(scenarioJSON);
             
-            // Update inputs and create matrices
-            numProcessesInput.value = scenario.allocated.length;
-            numResourcesInput.value = scenario.allocated[0].length;
+            // Validate imported scenario for the selected mode
+            const mode = modeSelect.value;
+            const numProcesses = scenario.allocated?.length || 0;
+            const numResources = scenario.allocated?.[0]?.length || 0;
             
-            // Trigger matrix creation
+            const validationError = validateInputForMode({
+                max: scenario.max || [],
+                allocated: scenario.allocated || [],
+                requested: scenario.requested || [],
+                available: scenario.available || []
+            }, mode, numProcesses, numResources);
+            
+            if (validationError) {
+                alert(validationError);
+                return;
+            }
+            
+            if (scenario.mode === 'multi' && scenario.requested && 
+                (Array.isArray(scenario.requested) && scenario.requested.length === 0)) {
+                delete scenario.requested;
+            }
+            
+            modeSelect.value = scenario.mode || 'single';
+            numProcessesInput.value = numProcesses;
+            numResourcesInput.value = numResources;
+            
             createMatricesButton.click();
             
-            // Populate matrices
             scenario.allocated.forEach((processAllocated, i) => {
                 processAllocated.forEach((val, j) => {
-                    document.getElementById(`allocated-${i}-${j}`).value = val;
+                    const input = document.getElementById(`allocated-${i}-${j}`);
+                    if (input) input.value = val;
                 });
             });
             
-            scenario.requested.forEach((processRequested, i) => {
-                processRequested.forEach((val, j) => {
-                    document.getElementById(`requested-${i}-${j}`).value = val;
+            if (scenario.mode === 'single' && scenario.requested) {
+                scenario.requested.forEach((processRequested, i) => {
+                    processRequested.forEach((val, j) => {
+                        const input = document.getElementById(`requested-${i}-${j}`);
+                        if (input) input.value = val;
+                    });
                 });
-            });
+            } else if (scenario.mode === 'multi' && scenario.max) {
+                scenario.max.forEach((processMax, i) => {
+                    processMax.forEach((val, j) => {
+                        const input = document.getElementById(`max-${i}-${j}`);
+                        if (input) input.value = val;
+                    });
+                });
+            }
             
             scenario.available.forEach((val, j) => {
-                document.getElementById(`available-${j}`).value = val;
+                const input = document.getElementById(`available-${j}`);
+                if (input) input.value = val;
             });
             
             scenarioImportModal.classList.add('hidden');
         } catch (error) {
-            alert('Invalid scenario JSON. Please check the format.');
+            alert(`Invalid scenario JSON. Please check the format and error: ${error.message}`);
         }
     });
 
     // Detect deadlock button
     detectDeadlockButton.addEventListener('click', () => {
-        const result = detectDeadlock();
-        displayResult(result);
-        visualizeSteps(result);
-        stepsContainer.classList.remove('hidden');
-    });
-});
-document.addEventListener('DOMContentLoaded', () => {
-    // ... [Previous existing code remains the same] ...
-
-    // Enhanced Deadlock Detection Function with Resolution Strategies
-    function detectDeadlock() {
-        const { allocated, requested, available } = getMatrixValues();
-        const numProcesses = allocated.length;
-        const numResources = available.length;
-        
-        const work = [...available];
-        const finish = new Array(numProcesses).fill(false);
-        const steps = [];
-        const resolutionStrategies = [];
-        
-        let progress = true;
-        while (progress) {
-            progress = false;
+        try {
+            const matrices = getMatrixValues();
+            const mode = modeSelect.value;
+            const numProcesses = parseInt(numProcessesInput.value);
+            const numResources = parseInt(numResourcesInput.value);
             
-            for (let i = 0; i < numProcesses; i++) {
-                if (finish[i]) continue;
-                
-                let canFinish = true;
-                for (let j = 0; j < numResources; j++) {
-                    if (requested[i][j] > work[j]) {
-                        canFinish = false;
-                        break;
-                    }
-                }
-                
-                if (canFinish) {
-                    const step = {
-                        process: i,
-                        request: requested[i],
-                        allocated: allocated[i],
-                        beforeAvailable: [...work],
-                        afterAvailable: null,
-                        description: `Process P${i} can proceed and release resources.`
-                    };
-                    
-                    finish[i] = true;
-                    progress = true;
-                    
-                    for (let j = 0; j < numResources; j++) {
-                        work[j] += allocated[i][j];
-                    }
-                    
-                    step.afterAvailable = [...work];
-                    steps.push(step);
-                }
+            // Validate input for the current mode
+            const validationError = validateInputForMode(matrices, mode, numProcesses, numResources);
+            if (validationError) {
+                alert(validationError);
+                return;
             }
-        }
-        
-        const deadlockedProcesses = [];
-        for (let i = 0; i < numProcesses; i++) {
-            if (!finish[i]) {
-                deadlockedProcesses.push(i);
-                
-                // Generate Resolution Strategies
-                const strategy = generateResolutionStrategy(i, requested[i], allocated[i], available);
-                resolutionStrategies.push(strategy);
+            
+            const result = detectDeadlock();
+            displayResult(result);
+            visualizeSteps(result);
+            if (mode === 'single') {
+                visualizeRAG(result.rag);
+                ragVisualization.style.display = 'block';
+                ragHeading.style.display = 'block';
+            } else {
+                ragVisualization.style.display = 'none';
+                ragHeading.style.display = 'none';
             }
+            stepsContainer.classList.remove('hidden');
+        } catch (error) {
+            alert(`Error detecting deadlock: ${error.message}`);
         }
-        
-        return { 
-            isDeadlock: deadlockedProcesses.length > 0,
-            deadlockedProcesses,
-            steps,
-            resolutionStrategies
-        };
-    }
-
-    // New function to generate resolution strategies
-    function generateResolutionStrategy(processIndex, requestedResources, allocatedResources, availableResources) {
-        const strategies = [
-            {
-                type: 'Preemption',
-                description: `Temporarily suspend process P${processIndex} and reallocate its resources to break the deadlock.`,
-                steps: [
-                    `Identify critical resources held by process P${processIndex}`,
-                    `Forcibly release all resources allocated to P${processIndex}`,
-                    `Redistribute resources to unblock waiting processes`
-                ]
-            },
-            {
-                type: 'Process Termination',
-                description: `Completely terminate process P${processIndex} to release all its resources.`,
-                steps: [
-                    `Rollback process P${processIndex} to a safe checkpoint`,
-                    `Release all resources held by P${processIndex}`,
-                    `Restart the process or reallocate its work to other processes`
-                ]
-            },
-            {
-                type: 'Resource Request Optimization',
-                description: `Optimize resource requests to prevent future deadlocks.`,
-                steps: [
-                    `Analyze resource request pattern of P${processIndex}`,
-                    `Implement more granular resource allocation`,
-                    `Introduce timeout or priority-based resource allocation`
-                ]
-            }
-        ];
-
-        // Select most appropriate strategy based on resource status
-        const totalRequestedResources = requestedResources.reduce((a, b) => a + b, 0);
-        const totalAllocatedResources = allocatedResources.reduce((a, b) => a + b, 0);
-        const totalAvailableResources = availableResources.reduce((a, b) => a + b, 0);
-
-        let selectedStrategy;
-        if (totalAvailableResources === 0) {
-            selectedStrategy = strategies[1]; // Process Termination
-        } else if (totalRequestedResources > totalAvailableResources * 1.5) {
-            selectedStrategy = strategies[0]; // Preemption
-        } else {
-            selectedStrategy = strategies[2]; // Resource Request Optimization
-        }
-
-        return {
-            processId: processIndex,
-            ...selectedStrategy
-        };
-    }
-
-    // Enhanced Visualization Function
-    function visualizeSteps(result) {
-        stepsVisualization.innerHTML = ''; // Clear previous visualization
-        
-        // Create deadlock message if needed
-        if (result.isDeadlock) {
-            const deadlockMessage = document.createElement('div');
-            deadlockMessage.classList.add('deadlock-message');
-            deadlockMessage.innerHTML = `
-                <div class="alert alert-danger">
-                    <h3>🚨 Deadlock Detected!</h3>
-                    <p>Processes ${result.deadlockedProcesses.map(p => `P${p}`).join(', ')} are in a deadlock.</p>
-                </div>
-            `;
-            stepsVisualization.appendChild(deadlockMessage);
-        }
-        
-        // Create steps timeline
-        const timeline = document.createElement('div');
-        timeline.classList.add('steps-timeline');
-        
-        // Previous step visualization code remains the same...
-
-        // Add Resolution Strategies Section
-        if (result.isDeadlock && result.resolutionStrategies.length > 0) {
-            const resolutionSection = document.createElement('div');
-            resolutionSection.classList.add('resolution-strategies');
-            resolutionSection.innerHTML = `
-                <h3>🔧 Deadlock Resolution Strategies</h3>
-            `;
-
-            result.resolutionStrategies.forEach(strategy => {
-                const strategyElement = document.createElement('div');
-                strategyElement.classList.add('strategy-card');
-                strategyElement.innerHTML = `
-                    <div class="strategy-header">
-                        <span class="strategy-type">${strategy.type}</span>
-                        <span class="strategy-process">Process P${strategy.processId}</span>
-                    </div>
-                    <div class="strategy-description">
-                        ${strategy.description}
-                    </div>
-                    <div class="strategy-steps">
-                        <strong>Resolution Steps:</strong>
-                        <ul>
-                            ${strategy.steps.map(step => `<li>${step}</li>`).join('')}
-                        </ul>
-                    </div>
-                `;
-                resolutionSection.appendChild(strategyElement);
-            });
-
-            stepsVisualization.appendChild(resolutionSection);
-        }
-    }
-
-    // Rest of the code remains the same...
+    });
 });
