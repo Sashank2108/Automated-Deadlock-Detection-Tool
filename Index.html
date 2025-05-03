@@ -5,44 +5,61 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Deadlock Detection Simulator</title>
     <link rel="stylesheet" href="styles.css">
+    <!-- Include vis.js for graph visualization -->
+    <script src="https://unpkg.com/vis-network@9.1.2/standalone/umd/vis-network.min.js"></script>
 </head>
 <body>
     <div class="container">
         <header>
             <h1>Deadlock Detection Simulator</h1>
-            <p class="subtitle">Visualize and Analyze Resource Allocation Scenarios</p>
+            <p class="subtitle"></p>
         </header>
 
         <main>
             <section id="simulatorSection" class="section active">
                 <div id="process-resource-controls">
-                    <div class="config-group">
-                        <label for="numProcesses">Number of Processes:</label>
-                        <input type="number" id="numProcesses" min="1" max="10" value="3" aria-label="Number of Processes" style="margin-left:10px;">
+                    <div class="config-container">
+                        <div class="config-group">
+                            <label for="modeSelect">Mode:</label>
+                            <select id="modeSelect" aria-label="Select Mode">
+                                <option value="single">Single (Allocated, Requested, Available)</option>
+                                <option value="multi">Multi (Max, Allocated, Available)</option>
+                            </select>
+                        </div>
+                        <div class="config-group">
+                            <label for="numProcesses">Number of Processes:</label>
+                            <input type="number" id="numProcesses" min="1" max="10" value="3" aria-label="Number of Processes">
+                        </div>
+                        <div class="config-group">
+                            <label for="numResources">Number of Resources:</label>
+                            <input type="number" id="numResources" min="1" max="10" value="3" aria-label="Number of Resource Types">
+                        </div>
                     </div>
-                    <div class="config-group">
-                        <label for="numResources">Number of Resources:</label>
-                        <input type="number" id="numResources" min="1" max="10" value="3" aria-label="Number of Resource Types" style="margin-left: 10px;">
-                    </div><br>
-                    <button id="createMatrices" class="primary-btn" aria-label="Configure Scenario">Intialize Matrices</button>
+                    <div class="button-container">
+                        <button id="createMatrices" class="primary-btn" aria-label="Configure Scenario">Configure Scenario</button>
+                    </div>
                 </div>
                 
                 <div id="matrices" class="hidden">
-                    <div class="matrix-section">
+                    <div class="matrix-section" id="maxSection">
+                        <h2>Maximum Resources</h2>
+                        <div class="matrix-container">
+                            <table id="maxTable" aria-label="Maximum Resources Table"></table>
+                        </div>
+                    </div>
+                    <div class="matrix-section" id="allocatedSection">
                         <h2>Allocated Resources</h2>
                         <div class="matrix-container">
                             <table id="allocatedTable" aria-label="Allocated Resources Table"></table>
                         </div>
                     </div>
-                    
-                    <div class="matrix-section">
+                    <div class="matrix-section" id="requestedSection">
                         <h2>Requested Resources</h2>
                         <div class="matrix-container">
                             <table id="requestedTable" aria-label="Requested Resources Table"></table>
                         </div>
                     </div>
-                    
-                    <div class="matrix-section">
+                    <div class="matrix-section" id="availableSection">
                         <h2>Available Resources</h2>
                         <div class="matrix-container">
                             <table id="availableTable" aria-label="Available Resources Table"></table>
@@ -62,11 +79,15 @@
                 <div id="steps-container" class="hidden">
                     <h2>Execution Steps Visualization</h2>
                     <div id="steps-visualization" class="steps-visualization"></div>
+                    <div id="rag-heading">
+                        <h2>Resource Allocation Graph</h2>
+                    </div>
+                    <div id="rag-visualization" class="rag-visualization"></div>
                 </div>
 
                 <div id="scenarioImportModal" class="modal hidden">
                     <div class="modal-content">
-                        <span class="close-modal" aria-label="Close Modal">&times;</span>
+                        <span class="close-modal" aria-label="Close Modal">×</span>
                         <h2>Import Scenario</h2>
                         <textarea id="scenarioImportText" placeholder="Paste your scenario JSON here" aria-label="Scenario Import Textarea"></textarea>
                         <button id="confirmImport" class="primary-btn" aria-label="Confirm Import">Import</button>
@@ -75,11 +96,11 @@
             </section>
         </main>
 
-        <!-- <footer>
-            <p>&copy; 2024 Deadlock Detection Simulator | Created for Educational Purposes</p>
-        </footer> -->
+        <footer>
+            <p></p>
+        </footer>
     </div>
 
     <script src="script.js"></script>
-</body>
+<script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'933bdb9d580edd1c',t:'MTc0NTIyNzc3NS4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
